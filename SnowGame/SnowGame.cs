@@ -1,6 +1,4 @@
-﻿// TOOD: Have players receive equipment when they use /join
-// TODO: Change the SSC file to not give the players any sort of equipment.s
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -65,7 +63,6 @@ namespace SnowGame
         private void OnJoin(JoinEventArgs args)
         {
             WhiteTeam.members.Add(TShock.Players[args.Who].Index);
-            // TODO: Remove the permission of the player to change teams and pvp mode.
         }
 
         private void OnTogglePvp(object sender, GetDataHandlers.TogglePvpEventArgs args)
@@ -99,7 +96,7 @@ namespace SnowGame
             TShock.Utils.Broadcast($"{TShock.Players[args.PlayerId].Name} just got killed!", Microsoft.Xna.Framework.Color.Aqua);
             if (args.Player.Team == (int)TeamID.Red)
             {
-                TShock.Utils.Broadcast("10 points go to the blue team!", Microsoft.Xna.Framework.Color.Blue); // Putting in random stuff as the second arg.
+                TShock.Utils.Broadcast("10 points go to the blue team!", Microsoft.Xna.Framework.Color.Blue);
                 BlueTeam.score += 10;
             }
             else
@@ -155,8 +152,43 @@ namespace SnowGame
                         args.Player.SetTeam((int)TeamID.Red);
                     }
 
+                    args.Player.SendInfoMessage("Giving you equipment!");
+
+                    args.TPlayer.inventory[0] = TShock.Utils.GetItemById(1319); // Puts the Snowball Cannon into the first inventory slot.
+                    NetMessage.SendData((int)PacketTypes.PlayerSlot, -1, -1, null, args.Player.Index, 0); // Sends the packet that does just that.
+
+                    args.TPlayer.inventory[54] = TShock.Utils.GetItemById(949); // Puts Snowballs into the first Ammo slot.
+                    args.TPlayer.inventory[54].stack = 999;
+                    NetMessage.SendData((int)PacketTypes.PlayerSlot, -1, -1, null, args.Player.Index, 54, 0, 999);
+
+                    if (args.TPlayer.Male)
+                    {
+                        args.TPlayer.armor[0] = TShock.Utils.GetItemById(803); // Puts the Snow Hood into the head armor slot.
+                        NetMessage.SendData((int)PacketTypes.PlayerSlot, -1, -1, null, args.Player.Index, 59);
+
+                        args.TPlayer.armor[1] = TShock.Utils.GetItemById(804); // Snow Coat
+                        NetMessage.SendData((int)PacketTypes.PlayerSlot, -1, -1, null, args.Player.Index, 60);
+
+                        args.TPlayer.armor[2] = TShock.Utils.GetItemById(805); // Snow Pants
+                        NetMessage.SendData((int)PacketTypes.PlayerSlot, -1, -1, null, args.Player.Index, 61);
+
+                    }
+                    else
+                    {
+                        args.TPlayer.armor[0] = TShock.Utils.GetItemById(978); // Pink Snow Hood
+                        NetMessage.SendData((int)PacketTypes.PlayerSlot, -1, -1, null, args.Player.Index, 59);
+
+                        args.TPlayer.armor[1] = TShock.Utils.GetItemById(979); // Pink Snow Coat
+                        NetMessage.SendData((int)PacketTypes.PlayerSlot, -1, -1, null, args.Player.Index, 60);
+
+                        args.TPlayer.armor[2] = TShock.Utils.GetItemById(980); // Pink Snow Pants
+                        NetMessage.SendData((int)PacketTypes.PlayerSlot, -1, -1, null, args.Player.Index, 61);
+                    }
+
                     args.Player.SetPvP(true);
                     args.Player.Teleport(1078f * 16, 132f * 16);
+                    // if (RedTeam.members.Count > 0 && BlueTeam.members.Count > 0
+                    // { GameInit() }
                 }
             }
 
@@ -169,12 +201,9 @@ namespace SnowGame
         // To be removed later. This is merely for Testing purposed.
         private void ForceGameInit(CommandArgs args)
         {
-            // TODO: Add 5 minutes timer
             System.Timers.Timer gameTimer = new System.Timers.Timer(30000); // Should be 5 minutes (300000) when no longer testing
             gameTimer.Enabled = true;
             gameTimer.Elapsed += OnForceGameInit;
-            // Teleport players to certain sides based on what their team is.
-            // Once the game ends, print out messages indicating who won and their score.
         }
 
         private void OnForceGameInit(object source, System.Timers.ElapsedEventArgs args)
@@ -185,9 +214,43 @@ namespace SnowGame
                 TShock.Players[member].Teleport(1078f * 16, 132f * 16);
                 TShock.Players[member].SetPvP(false);
                 TShock.Players[member].SetTeam((int)TeamID.White);
+                
+                for (int i = 0; i < 59; i++)
+                {
+                    TShock.Players[member].TPlayer.inventory[i] = TShock.Utils.GetItemById(0);
+                    NetMessage.SendData((int)PacketTypes.PlayerSlot, -1, -1, null, member, i);
+                }
+
+                for (int i = 0; i < 19; i++)
+                {
+                    TShock.Players[member].TPlayer.armor[i] = TShock.Utils.GetItemById(0);
+                    NetMessage.SendData((int)PacketTypes.PlayerSlot, -1, -1, null, member, i + 58);
+                }
+
                 WhiteTeam.members.Add(member);
                 RedTeam.members.Remove(member);
-                // Remove equipment too.
+            }
+
+            foreach (int member in BlueTeam.members)
+            {
+                TShock.Players[member].Teleport(1078f * 16, 132f * 16);
+                TShock.Players[member].SetPvP(false);
+                TShock.Players[member].SetTeam((int)TeamID.White);
+
+                for (int i = 0; i < 59; i++)
+                {
+                    TShock.Players[member].TPlayer.inventory[i] = TShock.Utils.GetItemById(0);
+                    NetMessage.SendData((int)PacketTypes.PlayerSlot, -1, -1, null, member, i);
+                }
+
+                for (int i = 0; i < 19; i++)
+                {
+                    TShock.Players[member].TPlayer.armor[i] = TShock.Utils.GetItemById(0);
+                    NetMessage.SendData((int)PacketTypes.PlayerSlot, -1, -1, null, member, i + 58);
+                }
+
+                WhiteTeam.members.Add(member);
+                BlueTeam.members.Remove(member);
             }
             // deactivate pvp, put everone into white team
         }
