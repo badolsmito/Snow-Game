@@ -1,4 +1,8 @@
-﻿using System;
+﻿// TODO: Add the OnServerLeave thing to check if a player was in a match when he left and if he was the last one of his team. this would end the game
+// and grant the win to the opposing team.
+// TODO: Disable NPC spawn, turn on Day-only and no events.
+// TODO: Find a better way to guarantee PVP statuses.
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -57,7 +61,7 @@ namespace SnowGame
         private void OnInitialize(EventArgs args)
         {
             Commands.ChatCommands.Add(new Command(WhiteTeam.Join, "join"));
-            Commands.ChatCommands.Add(new Command(ForceGameInit, "gameinit"));
+            //Commands.ChatCommands.Add(new Command(ForceGameInit, "gameinit"));
         }
 
         private void OnJoin(JoinEventArgs args)
@@ -186,9 +190,8 @@ namespace SnowGame
                     }
 
                     args.Player.SetPvP(true);
-                    args.Player.Teleport(1078f * 16, 132f * 16);
-                    // if (RedTeam.members.Count > 0 && BlueTeam.members.Count > 0
-                    // { GameInit() }
+                    args.Player.Teleport(1380f * 16, 255f * 16);
+                    if (RedTeam.members.Count > 0 && BlueTeam.members.Count > 0) { GameInit(); }
                 }
             }
 
@@ -197,24 +200,24 @@ namespace SnowGame
         public static GameTeam WhiteTeam = new GameTeam(TeamID.White, 0, new List<int>());
         private static GameTeam RedTeam = new GameTeam(TeamID.Red, 0, new List<int>());
         private static GameTeam BlueTeam = new GameTeam(TeamID.Blue, 0, new List<int>());
-        
-        // To be removed later. This is merely for Testing purposed.
-        private void ForceGameInit(CommandArgs args)
+
+        static private void GameInit()
         {
-            System.Timers.Timer gameTimer = new System.Timers.Timer(30000); // Should be 5 minutes (300000) when no longer testing
+            System.Timers.Timer gameTimer = new System.Timers.Timer(300000);
+            TShock.Utils.Broadcast("The game has begun!", Microsoft.Xna.Framework.Color.Green);
             gameTimer.Enabled = true;
-            gameTimer.Elapsed += OnForceGameInit;
+            gameTimer.Elapsed += OnGameElapse;
         }
 
-        private void OnForceGameInit(object source, System.Timers.ElapsedEventArgs args)
+        static private void OnGameElapse(object source, System.Timers.ElapsedEventArgs args)
         {
             TShock.Utils.Broadcast($"The {(RedTeam.score > BlueTeam.score ? "red" : "blue")} team won with {(RedTeam.score > BlueTeam.score ? RedTeam.score : BlueTeam.score)} score points!", Microsoft.Xna.Framework.Color.Blue);
             foreach (int member in RedTeam.members)
             {
-                TShock.Players[member].Teleport(1078f * 16, 132f * 16);
+                TShock.Players[member].Teleport(1380f * 16, 255f * 16);
                 TShock.Players[member].SetPvP(false);
                 TShock.Players[member].SetTeam((int)TeamID.White);
-                
+
                 for (int i = 0; i < 59; i++)
                 {
                     TShock.Players[member].TPlayer.inventory[i] = TShock.Utils.GetItemById(0);
@@ -233,7 +236,7 @@ namespace SnowGame
 
             foreach (int member in BlueTeam.members)
             {
-                TShock.Players[member].Teleport(1078f * 16, 132f * 16);
+                TShock.Players[member].Teleport(1380f * 16, 255f * 16);
                 TShock.Players[member].SetPvP(false);
                 TShock.Players[member].SetTeam((int)TeamID.White);
 
@@ -252,7 +255,6 @@ namespace SnowGame
                 WhiteTeam.members.Add(member);
                 BlueTeam.members.Remove(member);
             }
-            // deactivate pvp, put everone into white team
         }
     }
 }
