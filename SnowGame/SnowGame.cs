@@ -1,7 +1,9 @@
-﻿// TODO: Add the OnServerLeave thing to check if a player was in a match when he left and if he was the last one of his team. this would end the game
+﻿// TODO: Add the OnServerLeave thing to check if a player was in a match when he left and if he was the last one of his team. this would end the game.
 // and grant the win to the opposing team.
-// TODO: Disable NPC spawn, turn on Day-only and no events.
-// TODO: Find a better way to guarantee PVP statuses.
+// TODO: Add a feature that allows players to obtain a happy grenade and a water bottle every 45 seconds. This should not be hard-coded. Instead, a TOML
+// file should be used for configuring this plugin (e. g. setting the spawn location, what items would be given, the cool-down etc.)
+// TODO: Have the NPCs not move in the player bases.
+// TODO: When a player leaves, all of his items should also be gone.
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -33,7 +35,6 @@ namespace SnowGame
 
         }
 
-
         public override void Initialize()
         {
             ServerApi.Hooks.GameInitialize.Register(this, OnInitialize);
@@ -53,7 +54,6 @@ namespace SnowGame
                 GetDataHandlers.TogglePvp -= OnTogglePvp;
                 GetDataHandlers.PlayerTeam -= OnPlayerTeamChange;
                 GetDataHandlers.KillMe -= OnKillMe;
-
             }
             base.Dispose(disposing);
         }
@@ -61,7 +61,6 @@ namespace SnowGame
         private void OnInitialize(EventArgs args)
         {
             Commands.ChatCommands.Add(new Command(WhiteTeam.Join, "join"));
-            //Commands.ChatCommands.Add(new Command(ForceGameInit, "gameinit"));
         }
 
         private void OnJoin(JoinEventArgs args)
@@ -71,10 +70,16 @@ namespace SnowGame
 
         private void OnTogglePvp(object sender, GetDataHandlers.TogglePvpEventArgs args)
         {
-
-            args.Player.SetPvP(true);
-            TShock.Players[args.PlayerId].SendInfoMessage("You cannot toggle PVP off!");
-
+            if (args.Player.Team != (int)TeamID.White)
+            {
+                args.Player.SetPvP(true);
+                TShock.Players[args.PlayerId].SendInfoMessage("You cannot toggle PVP off!");
+            }
+            else
+            {
+                args.Player.SetPvP(false);
+                TShock.Players[args.PlayerId].SendInfoMessage("You cannot toggle PVP on!");
+            }
         }
 
         private void OnPlayerTeamChange(object sender, GetDataHandlers.PlayerTeamEventArgs args)
@@ -97,19 +102,33 @@ namespace SnowGame
 
         private void OnKillMe(object sender, GetDataHandlers.KillMeEventArgs args)
         {
-            TShock.Utils.Broadcast($"{TShock.Players[args.PlayerId].Name} just got killed!", Microsoft.Xna.Framework.Color.Aqua);
+            args.PlayerDeathReason._sourceCustomReason = "";
+            TShock.Utils.Broadcast($"{TShock.Players[args.PlayerId].Name} just got killed by {TShock.Players[args.PlayerDeathReason._sourcePlayerIndex].Name}!", Microsoft.Xna.Framework.Color.Aqua);
+
             if (args.Player.Team == (int)TeamID.Red)
             {
                 TShock.Utils.Broadcast("10 points go to the blue team!", Microsoft.Xna.Framework.Color.Blue);
                 BlueTeam.score += 10;
+
+                Terraria.Main.spawnTileX = 1208;
+                Terraria.Main.spawnTileY = 231;
+
+                 TShock.Players[args.PlayerId].Teleport(1208 * 16, 231 * 16);
             }
             else
             {
                 TShock.Utils.Broadcast("10 points go to the red team!", Microsoft.Xna.Framework.Color.Red);
                 RedTeam.score += 10;
+
+                Terraria.Main.spawnTileX = 989;
+                Terraria.Main.spawnTileY = 231;
+
+                TShock.Players[args.PlayerId].Teleport(989 * 16, 231 * 16);
             }
+            TShock.Players[args.PlayerDeathReason._sourcePlayerIndex].SetBuff(58, 600);
             TShock.Utils.Broadcast($"The red team has currently {RedTeam.score} points and the blue team has {BlueTeam.score} points!", Microsoft.Xna.Framework.Color.AliceBlue);
         }
+
         public enum TeamID
         {
             White,
@@ -149,11 +168,13 @@ namespace SnowGame
                     {
                         BlueTeam.members.Add(args.Player.Index);
                         args.Player.SetTeam((int)TeamID.Blue);
+                        args.Player.Teleport(989f * 16, 231f * 16);
                     }
                     else
                     {
                         RedTeam.members.Add(args.Player.Index);
                         args.Player.SetTeam((int)TeamID.Red);
+                        args.Player.Teleport(1208f * 16, 231f * 16);
                     }
 
                     args.Player.SendInfoMessage("Giving you equipment!");
@@ -164,6 +185,9 @@ namespace SnowGame
                     args.TPlayer.inventory[54] = TShock.Utils.GetItemById(949); // Puts Snowballs into the first Ammo slot.
                     args.TPlayer.inventory[54].stack = 999;
                     NetMessage.SendData((int)PacketTypes.PlayerSlot, -1, -1, null, args.Player.Index, 54, 0, 999);
+
+                    args.TPlayer.inventory[9] = TShock.Utils.GetItemById(1299); // Binoculars in the last place in the hotbar
+                    NetMessage.SendData((int)PacketTypes.PlayerSlot, -1, -1, null, args.Player.Index, 9);
 
                     if (args.TPlayer.Male)
                     {
@@ -190,7 +214,6 @@ namespace SnowGame
                     }
 
                     args.Player.SetPvP(true);
-                    args.Player.Teleport(1380f * 16, 255f * 16);
                     if (RedTeam.members.Count > 0 && BlueTeam.members.Count > 0) { GameInit(); }
                 }
             }
@@ -211,7 +234,18 @@ namespace SnowGame
 
         static private void OnGameElapse(object source, System.Timers.ElapsedEventArgs args)
         {
-            TShock.Utils.Broadcast($"The {(RedTeam.score > BlueTeam.score ? "red" : "blue")} team won with {(RedTeam.score > BlueTeam.score ? RedTeam.score : BlueTeam.score)} score points!", Microsoft.Xna.Framework.Color.Blue);
+            if (RedTeam.score > BlueTeam.score)
+            {
+                TShock.Utils.Broadcast($"The red team won with {RedTeam.score} score points!", Microsoft.Xna.Framework.Color.AntiqueWhite);
+            }
+            else if (BlueTeam.score > RedTeam.score)
+            {
+                TShock.Utils.Broadcast($"The blue team won with {BlueTeam.score} score points!", Microsoft.Xna.Framework.Color.AntiqueWhite);
+            }
+            else
+            {
+                TShock.Utils.Broadcast($"The game has ended in a draw! Both teams have {RedTeam.score} score points!", Microsoft.Xna.Framework.Color.AntiqueWhite);
+            }
             foreach (int member in RedTeam.members)
             {
                 TShock.Players[member].Teleport(1380f * 16, 255f * 16);
@@ -254,6 +288,13 @@ namespace SnowGame
 
                 WhiteTeam.members.Add(member);
                 BlueTeam.members.Remove(member);
+            }
+
+            foreach (int member in WhiteTeam.members)
+            {
+                Terraria.Main.spawnTileX = 1380;
+                Terraria.Main.spawnTileY = 255;
+                TShock.Players[member].Teleport(1380 * 16, 255 * 16);
             }
         }
     }
